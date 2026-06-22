@@ -14,8 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CategoryIcon } from '@/components/category-icon'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency, formatDateInput } from '@/lib/format'
-import type { Category, Transaction, TransactionType } from '@/lib/types'
-import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react'
+import type { Account, Category, Transaction, TransactionType } from '@/lib/types'
+import { TrendingUp, TrendingDown, Loader2, Wallet } from 'lucide-react'
 
 const schema = z.object({
   type: z.enum(['INCOME', 'EXPENSE']),
@@ -23,6 +23,7 @@ const schema = z.object({
   description: z.string().max(200).optional().default(''),
   date: z.string().min(1, 'La fecha es obligatoria'),
   categoryId: z.string().min(1, 'Selecciona una categoría'),
+  accountId: z.string().optional().default(''),
 })
 
 type FormData = z.infer<typeof schema>
@@ -31,6 +32,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   categories: Category[]
+  accounts: Account[]
   editingTransaction?: Transaction | null
   onSaved: () => void
 }
@@ -39,6 +41,7 @@ export function TransactionFormDialog({
   open,
   onOpenChange,
   categories,
+  accounts,
   editingTransaction,
   onSaved,
 }: Props) {
@@ -60,12 +63,14 @@ export function TransactionFormDialog({
       description: '',
       date: formatDateInput(new Date()),
       categoryId: '',
+      accountId: '',
     },
   })
 
   const currentType = watch('type')
   const currentAmount = watch('amount')
   const currentCategoryId = watch('categoryId')
+  const currentAccountId = watch('accountId')
 
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.type === currentType),
@@ -79,6 +84,7 @@ export function TransactionFormDialog({
       setValue('description', editingTransaction.description)
       setValue('date', formatDateInput(editingTransaction.date))
       setValue('categoryId', editingTransaction.categoryId)
+      setValue('accountId', editingTransaction.accountId ?? '')
     } else {
       reset({
         type: 'EXPENSE',
@@ -86,6 +92,7 @@ export function TransactionFormDialog({
         description: '',
         date: formatDateInput(new Date()),
         categoryId: '',
+        accountId: '',
       })
     }
   }, [editingTransaction, setValue, reset])
@@ -229,6 +236,39 @@ export function TransactionFormDialog({
             </Select>
             {errors.categoryId && (
               <p className="text-sm text-destructive">{errors.categoryId.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="accountId">Cuenta (opcional)</Label>
+            <Select
+              value={currentAccountId}
+              onValueChange={(v) => setValue('accountId', v === '__none__' ? '' : v)}
+            >
+              <SelectTrigger id="accountId">
+                <SelectValue placeholder="Sin cuenta específica" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin cuenta específica</SelectItem>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex h-6 w-6 items-center justify-center rounded-md"
+                        style={{ backgroundColor: `${a.color}20`, color: a.color }}
+                      >
+                        <Wallet className="h-3.5 w-3.5" />
+                      </span>
+                      <span>{a.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {accounts.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No tienes cuentas creadas. Puedes crearlas en la pestaña Cuentas.
+              </p>
             )}
           </div>
 

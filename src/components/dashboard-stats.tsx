@@ -3,8 +3,10 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CategoryIcon } from '@/components/category-icon'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatCurrencyShort } from '@/lib/format'
-import type { Stats } from '@/lib/types'
+import type { Budget, Stats } from '@/lib/types'
 import {
   Area,
   AreaChart,
@@ -17,13 +19,32 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Inbox } from 'lucide-react'
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  PiggyBank,
+  Inbox,
+  Banknote,
+  Landmark,
+  CreditCard,
+  Target,
+  AlertTriangle,
+  CheckCircle2,
+} from 'lucide-react'
 
 interface Props {
   stats: Stats | null
+  budgets: Budget[]
 }
 
-export function DashboardStats({ stats }: Props) {
+const ACCOUNT_TYPE_ICON = {
+  CASH: Banknote,
+  BANK: Landmark,
+  CARD: CreditCard,
+}
+
+export function DashboardStats({ stats, budgets }: Props) {
   const expenseByCategory = useMemo(
     () => stats?.byCategory.filter((c) => c.type === 'EXPENSE') ?? [],
     [stats]
@@ -215,6 +236,124 @@ export function DashboardStats({ stats }: Props) {
           emptyText="Sin ingresos registrados"
         />
       </div>
+
+      {/* Budgets progress */}
+      {budgets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="h-4 w-4 text-primary" />
+              Presupuestos del mes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {budgets.slice(0, 6).map((b) => {
+                const spent = b.spent ?? 0
+                const pct = b.amount > 0 ? (spent / b.amount) * 100 : 0
+                const over = spent > b.amount
+                return (
+                  <div key={b.id} className="flex items-center gap-3">
+                    <span
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md"
+                      style={{ backgroundColor: `${b.category.color}20`, color: b.category.color }}
+                    >
+                      <CategoryIcon name={b.category.icon} className="h-4 w-4" />
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-medium">{b.category.name}</span>
+                        <span className="text-xs tabular-nums">
+                          <span className={over ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'font-semibold'}>
+                            {formatCurrency(spent)}
+                          </span>
+                          <span className="text-muted-foreground"> / {formatCurrency(b.amount)}</span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Progress
+                          value={Math.min(pct, 100)}
+                          className="h-1.5"
+                          indicatorColor={
+                            over
+                              ? 'bg-rose-500'
+                              : pct >= 80
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }
+                        />
+                        <Badge
+                          variant="outline"
+                          className={`flex-shrink-0 text-xs ${
+                            over
+                              ? 'border-rose-300 text-rose-600 dark:border-rose-800 dark:text-rose-400'
+                              : pct >= 80
+                              ? 'border-amber-300 text-amber-600 dark:border-amber-800 dark:text-amber-400'
+                              : 'border-emerald-300 text-emerald-600 dark:border-emerald-800 dark:text-emerald-400'
+                          }`}
+                        >
+                          {over ? (
+                            <AlertTriangle className="mr-1 h-3 w-3" />
+                          ) : (
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                          )}
+                          {pct.toFixed(0)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Account balances */}
+      {stats.byAccount.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wallet className="h-4 w-4 text-primary" />
+              Saldos por cuenta
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {stats.byAccount.map((a) => {
+                const Icon = ACCOUNT_TYPE_ICON[a.type as keyof typeof ACCOUNT_TYPE_ICON] ?? Wallet
+                const positive = a.balance >= 0
+                return (
+                  <div
+                    key={a.name}
+                    className="flex items-center gap-3 rounded-lg border p-3"
+                  >
+                    <span
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
+                      style={{ backgroundColor: `${a.color}20`, color: a.color }}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-medium">{a.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Ing: {formatCurrency(a.income)} · Gas: {formatCurrency(a.expense)}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                      }`}
+                    >
+                      {formatCurrency(a.balance)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

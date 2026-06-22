@@ -28,13 +28,18 @@ export async function GET(req: NextRequest) {
       if (endDate) (where.date as Record<string, unknown>).lte = endDate
     }
 
-    const [transactions, allTransactions] = await Promise.all([
+    const [transactions, allTransactions, accounts] = await Promise.all([
       db.transaction.findMany({
         where,
-        include: { category: true },
+        include: { category: true, account: true },
         orderBy: { date: 'desc' },
       }),
       db.transaction.findMany({ select: { amount: true, type: true, date: true } }),
+      db.account.findMany({
+        include: {
+          transactions: { select: { type: true, amount: true } },
+        },
+      }),
     ])
 
     const totalIncome = transactions
@@ -100,6 +105,24 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Compute balance per account (lifetime, not month-scoped)
+    const byAccount = accounts.map((a) => {
+      const income = a.transactions
+        .filter((t) => t.type === 'INCOME')
+        .reduce((s, t) => s + t.amount, 0)
+      const expense = a.transactions
+        .filter((t) => t.type === 'EXPENSE')
+        .reduce((s, t) => s + t.amount, 0)
+      return {
+        name: a.name,
+        color: a.color,
+        type: a.type,
+        income,
+        expense,
+        balance: a.initialBalance + income - expense,
+      }
+    })
+
     return NextResponse.json({
       totalIncome,
       totalExpense,
@@ -107,6 +130,7 @@ export async function GET(req: NextRequest) {
       transactionCount: transactions.length,
       byCategory,
       monthlyTrend: months,
+      byAccount,
     })
   } catch (error) {
     console.error('Error fetching stats:', error)

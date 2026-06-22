@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/category-icon'
 import { formatCurrency, formatDate } from '@/lib/format'
 import type { Category, Transaction } from '@/lib/types'
-import { Search, Pencil, Trash2, TrendingUp, TrendingDown, Inbox } from 'lucide-react'
+import { Search, Pencil, Trash2, TrendingUp, TrendingDown, Inbox, Wallet } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,13 +131,23 @@ export function TransactionList({ transactions, categories, onEdit, onDeleted }:
               </div>
 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-medium">
                     {t.description || t.category.name}
                   </p>
                   <Badge variant="outline" className="hidden sm:inline-flex text-xs">
                     {t.category.name}
                   </Badge>
+                  {t.account && (
+                    <Badge
+                      variant="outline"
+                      className="hidden md:inline-flex text-xs gap-1"
+                      style={{ color: t.account.color, borderColor: `${t.account.color}40` }}
+                    >
+                      <Wallet className="h-3 w-3" />
+                      {t.account.name}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">{formatDate(t.date)}</p>
               </div>

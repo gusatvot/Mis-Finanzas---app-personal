@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const type = searchParams.get('type') // INCOME | EXPENSE
     const categoryId = searchParams.get('categoryId')
+    const accountId = searchParams.get('accountId')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     const search = searchParams.get('search')
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
     const where: Record<string, unknown> = {}
     if (type) where.type = type
     if (categoryId) where.categoryId = categoryId
+    if (accountId) where.accountId = accountId
     if (from || to) {
       where.date = {}
       if (from) (where.date as Record<string, unknown>).gte = new Date(from)
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest) {
     const transactions = await db.transaction.findMany({
       where,
       orderBy: { date: 'desc' },
-      include: { category: true },
+      include: { category: true, account: true },
       ...(limit > 0 ? { take: limit } : {}),
     })
 
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { type, amount, description, date, categoryId } = body
+    const { type, amount, description, date, categoryId, accountId } = body
 
     if (!type || !amount || !date || !categoryId) {
       return NextResponse.json(
@@ -83,8 +85,9 @@ export async function POST(req: NextRequest) {
         description: (description || '').trim(),
         date: new Date(date),
         categoryId,
+        accountId: accountId || null,
       },
-      include: { category: true },
+      include: { category: true, account: true },
     })
 
     return NextResponse.json(transaction, { status: 201 })

@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+
+// DELETE /api/accounts/[id]
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    // The FK has onDelete: SetNull, so transactions will keep their accountId = NULL
+    await db.account.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting account:', error)
+    return NextResponse.json(
+      { error: 'Error al eliminar cuenta' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT /api/accounts/[id]
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await req.json()
+    const { name, type, color, initialBalance } = body
+
+    if (!name || !type) {
+      return NextResponse.json(
+        { error: 'Nombre y tipo son obligatorios' },
+        { status: 400 }
+      )
+    }
+
+    if (!['CASH', 'BANK', 'CARD'].includes(type)) {
+      return NextResponse.json(
+        { error: 'Tipo debe ser CASH, BANK o CARD' },
+        { status: 400 }
+      )
+    }
+
+    const account = await db.account.update({
+      where: { id },
+      data: {
+        name: name.trim(),
+        type,
+        color: color || '#64748b',
+        initialBalance: typeof initialBalance === 'number' ? initialBalance : 0,
+      },
+    })
+
+    return NextResponse.json(account)
+  } catch (error) {
+    console.error('Error updating account:', error)
+    return NextResponse.json(
+      { error: 'Error al actualizar cuenta' },
+      { status: 500 }
+    )
+  }
+}

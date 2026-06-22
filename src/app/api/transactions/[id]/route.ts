@@ -27,7 +27,7 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await req.json()
-    const { type, amount, description, date, categoryId } = body
+    const { type, amount, description, date, categoryId, accountId } = body
 
     if (!type || !amount || !date || !categoryId) {
       return NextResponse.json(
@@ -44,8 +44,9 @@ export async function PUT(
         description: (description || '').trim(),
         date: new Date(date),
         categoryId,
+        accountId: accountId || null,
       },
-      include: { category: true },
+      include: { category: true, account: true },
     })
 
     return NextResponse.json(transaction)

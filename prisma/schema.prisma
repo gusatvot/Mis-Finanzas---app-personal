@@ -20,6 +20,21 @@ model Category {
   updatedAt DateTime @updatedAt
 
   transactions Transaction[]
+  budgets      Budget[]
+  recurring    RecurringTransaction[]
+}
+
+model Account {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // CASH | BANK | CARD
+  color     String   @default("#64748b")
+  initialBalance Float @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  recurring    RecurringTransaction[]
 }
 
 model Transaction {
@@ -29,12 +44,54 @@ model Transaction {
   description String
   date        DateTime
   categoryId  String
+  accountId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account  Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
   @@index([date])
   @@index([type])
   @@index([categoryId])
+  @@index([accountId])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  categoryId String
+  month      String   // YYYY-MM
+  amount     Float
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, month])
+  @@index([month])
+}
+
+model RecurringTransaction {
+  id           String   @id @default(cuid())
+  type         String   // INCOME | EXPENSE
+  amount       Float
+  description  String
+  categoryId   String
+  accountId    String?
+  frequency    String   // DAILY | WEEKLY | MONTHLY | YEARLY
+  dayOfMonth   Int?     // for MONTHLY/YEARLY: day of month (1-31)
+  dayOfWeek    Int?     // for WEEKLY: 0-6 (0 = Sunday)
+  startDate    DateTime
+  endDate      DateTime?
+  lastPosted   DateTime?
+  nextDue      DateTime
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account  Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([nextDue])
+  @@index([active])
 }

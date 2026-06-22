@@ -17,6 +17,9 @@ import { TransactionFormDialog } from '@/components/transaction-form-dialog'
 import { TransactionList } from '@/components/transaction-list'
 import { DashboardStats } from '@/components/dashboard-stats'
 import { CategoryManager } from '@/components/category-manager'
+import { AccountManager } from '@/components/account-manager'
+import { BudgetManager } from '@/components/budget-manager'
+import { RecurringManager } from '@/components/recurring-manager'
 import { useFinanceData } from '@/hooks/use-finance-data'
 import { useToast } from '@/hooks/use-toast'
 import { monthKey, monthLabel } from '@/lib/format'
@@ -27,9 +30,13 @@ import {
   LayoutDashboard,
   Receipt,
   Tags,
+  Banknote,
+  Target,
+  Repeat,
   AlertCircle,
   Sparkles,
-  Trash2,
+  Download,
+  Loader2,
 } from 'lucide-react'
 
 const MONTH_OPTIONS = (() => {
@@ -50,10 +57,20 @@ export default function Home() {
   const [tab, setTab] = useState('dashboard')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [exporting, setExporting] = useState(false)
   const { toast } = useToast()
 
-  const { categories, transactions, stats, loading, error, reload } =
-    useFinanceData(selectedMonth)
+  const {
+    categories,
+    accounts,
+    transactions,
+    stats,
+    budgets,
+    recurring,
+    loading,
+    error,
+    reload,
+  } = useFinanceData(selectedMonth)
 
   const monthTransactions = useMemo(() => {
     return transactions.filter((t) => {
@@ -73,24 +90,32 @@ export default function Home() {
     setDialogOpen(true)
   }
 
-  const handleSeed = async () => {
+  const handleExport = async () => {
+    setExporting(true)
     try {
-      const res = await fetch('/api/seed', { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.message || err.error || 'Error al sembrar')
-      }
+      const res = await fetch(`/api/export?month=${selectedMonth}`)
+      if (!res.ok) throw new Error('Error al exportar')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `transacciones_${selectedMonth}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
       toast({
-        title: 'Datos de ejemplo cargados',
-        description: 'Se crearon categorías y transacciones de demostración.',
+        title: 'CSV exportado',
+        description: `Se descargaron ${monthTransactions.length} transacciones.`,
       })
-      reload()
     } catch (err) {
       toast({
-        title: 'No se pudo sembrar',
+        title: 'Error al exportar',
         description: err instanceof Error ? err.message : 'Error desconocido',
         variant: 'destructive',
       })
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -113,7 +138,7 @@ export default function Home() {
 
           <div className="ml-auto flex items-center gap-2">
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[160px] sm:w-[200px]">
+              <SelectTrigger className="w-[140px] sm:w-[200px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -124,6 +149,31 @@ export default function Home() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Button
+              onClick={handleExport}
+              size="sm"
+              variant="outline"
+              className="hidden sm:inline-flex"
+              disabled={exporting || monthTransactions.length === 0}
+              title="Exportar transacciones del mes a CSV"
+            >
+              {exporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              CSV
+            </Button>
+            <Button
+              onClick={handleExport}
+              size="icon"
+              variant="outline"
+              className="sm:hidden"
+              disabled={exporting || monthTransactions.length === 0}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
 
             <Button onClick={handleNew} size="sm" className="hidden sm:inline-flex">
               <Plus className="mr-2 h-4 w-4" />
@@ -155,34 +205,48 @@ export default function Home() {
           </Card>
         ) : loading ? (
           <LoadingState />
-        ) : categories.length === 0 ? (
-          <EmptyState onSeed={handleSeed} />
         ) : (
           <Tabs value={tab} onValueChange={setTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-md">
-              <TabsTrigger value="dashboard" className="gap-2">
-                <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden sm:inline">Resumen</span>
-              </TabsTrigger>
-              <TabsTrigger value="transactions" className="gap-2">
-                <Receipt className="h-4 w-4" />
-                <span className="hidden sm:inline">Transacciones</span>
-              </TabsTrigger>
-              <TabsTrigger value="categories" className="gap-2">
-                <Tags className="h-4 w-4" />
-                <span className="hidden sm:inline">Categorías</span>
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto">
+              <TabsList className="grid w-full min-w-[640px] grid-cols-6">
+                <TabsTrigger value="dashboard" className="gap-1.5">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="hidden lg:inline">Resumen</span>
+                </TabsTrigger>
+                <TabsTrigger value="transactions" className="gap-1.5">
+                  <Receipt className="h-4 w-4" />
+                  <span className="hidden lg:inline">Transacciones</span>
+                </TabsTrigger>
+                <TabsTrigger value="accounts" className="gap-1.5">
+                  <Banknote className="h-4 w-4" />
+                  <span className="hidden lg:inline">Cuentas</span>
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="gap-1.5">
+                  <Tags className="h-4 w-4" />
+                  <span className="hidden lg:inline">Categorías</span>
+                </TabsTrigger>
+                <TabsTrigger value="budgets" className="gap-1.5">
+                  <Target className="h-4 w-4" />
+                  <span className="hidden lg:inline">Presupuestos</span>
+                </TabsTrigger>
+                <TabsTrigger value="recurring" className="gap-1.5">
+                  <Repeat className="h-4 w-4" />
+                  <span className="hidden lg:inline">Recurrentes</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="dashboard" className="space-y-6 outline-none">
-              <DashboardStats stats={stats} />
+              <DashboardStats stats={stats} budgets={budgets} />
             </TabsContent>
 
             <TabsContent value="transactions" className="space-y-6 outline-none">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between text-base">
-                    <span>Transacciones de {MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label}</span>
+                    <span>
+                      Transacciones de {MONTH_OPTIONS.find((m) => m.value === selectedMonth)?.label}
+                    </span>
                     <span className="text-sm font-normal text-muted-foreground">
                       {monthTransactions.length} registros
                     </span>
@@ -199,13 +263,56 @@ export default function Home() {
               </Card>
             </TabsContent>
 
+            <TabsContent value="accounts" className="space-y-6 outline-none">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Cuentas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountManager accounts={accounts} onSaved={reload} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="categories" className="space-y-6 outline-none">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Gestión de categorías</CardTitle>
+                  <CardTitle className="text-base">Categorías</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CategoryManager categories={categories} onSaved={reload} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="budgets" className="space-y-6 outline-none">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Presupuestos del mes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BudgetManager
+                    budgets={budgets}
+                    categories={categories}
+                    month={selectedMonth}
+                    onSaved={reload}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="recurring" className="space-y-6 outline-none">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Transacciones recurrentes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RecurringManager
+                    recurring={recurring}
+                    categories={categories}
+                    accounts={accounts}
+                    onSaved={reload}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -227,6 +334,7 @@ export default function Home() {
           if (!open) setEditingTx(null)
         }}
         categories={categories}
+        accounts={accounts}
         editingTransaction={editingTx}
         onSaved={reload}
       />
@@ -248,30 +356,5 @@ function LoadingState() {
         <Skeleton className="h-[300px] rounded-xl" />
       </div>
     </div>
-  )
-}
-
-function EmptyState({ onSeed }: { onSeed: () => void }) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <Sparkles className="h-8 w-8 text-primary" />
-        </div>
-        <div className="max-w-md space-y-1">
-          <h2 className="text-xl font-bold">¡Bienvenido a Mis Finanzas!</h2>
-          <p className="text-sm text-muted-foreground">
-            Para empezar, puedes cargar tus propias categorías desde la pestaña
-            “Categorías”, o crear datos de ejemplo para ver cómo funciona la app.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={onSeed}>
-            <Sparkles className="mr-2 h-4 w-4" />
-            Crear datos de ejemplo
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
