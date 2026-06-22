@@ -164,12 +164,18 @@ export function TransactionFormDialog({
               value={currentType}
               onValueChange={(v) => setValue('type', v as TransactionType)}
             >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="EXPENSE" className="gap-2">
+              <TabsList className="grid w-full grid-cols-2 bg-muted/60">
+                <TabsTrigger
+                  value="EXPENSE"
+                  className="gap-2 text-rose-600/80 hover:text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-rose-950/50 dark:data-[state=active]:text-rose-300 dark:text-rose-400/80"
+                >
                   <TrendingDown className="h-4 w-4" />
                   Gasto
                 </TabsTrigger>
-                <TabsTrigger value="INCOME" className="gap-2">
+                <TabsTrigger
+                  value="INCOME"
+                  className="gap-2 text-emerald-600/80 hover:text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-emerald-950/50 dark:data-[state=active]:text-emerald-300 dark:text-emerald-400/80"
+                >
                   <TrendingUp className="h-4 w-4" />
                   Ingreso
                 </TabsTrigger>
