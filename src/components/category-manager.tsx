@@ -215,9 +215,19 @@ export function CategoryManager({ categories, onSaved }: Props) {
             <div className="space-y-2">
               <Label>Tipo</Label>
               <Tabs value={type} onValueChange={(v) => setType(v as TransactionType)}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="EXPENSE">Gasto</TabsTrigger>
-                  <TabsTrigger value="INCOME">Ingreso</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 bg-muted/60">
+                  <TabsTrigger
+                    value="EXPENSE"
+                    className="text-rose-600/80 hover:text-rose-700 data-[state=active]:bg-rose-100 data-[state=active]:text-rose-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-rose-950/50 dark:data-[state=active]:text-rose-300 dark:text-rose-400/80"
+                  >
+                    Gasto
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="INCOME"
+                    className="text-emerald-600/80 hover:text-emerald-700 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-emerald-950/50 dark:data-[state=active]:text-emerald-300 dark:text-emerald-400/80"
+                  >
+                    Ingreso
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
