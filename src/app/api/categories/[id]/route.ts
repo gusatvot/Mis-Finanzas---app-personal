@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // DELETE /api/categories/[id]
 export async function DELETE(
@@ -7,10 +8,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
 
+    // Make sure the category belongs to the user
+    const category = await db.category.findFirst({ where: { id, userId } })
+    if (!category) {
+      return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
+    }
+
     const transactionsCount = await db.transaction.count({
-      where: { categoryId: id },
+      where: { categoryId: id, userId },
     })
 
     if (transactionsCount > 0) {
@@ -39,6 +51,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await req.json()
     const { name, type, color, icon } = body
@@ -48,6 +65,12 @@ export async function PUT(
         { error: 'Nombre y tipo son obligatorios' },
         { status: 400 }
       )
+    }
+
+    // Make sure the category belongs to the user
+    const existing = await db.category.findFirst({ where: { id, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Categoría no encontrada' }, { status: 404 })
     }
 
     const category = await db.category.update({

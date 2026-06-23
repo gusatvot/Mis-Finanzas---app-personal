@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // GET /api/accounts - list all accounts with computed balance
 export async function GET() {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const accounts = await db.account.findMany({
+      where: { userId },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
       include: {
         transactions: { select: { type: true, amount: true } },
@@ -15,17 +22,17 @@ export async function GET() {
     const result = accounts.map((a) => {
       const income = a.transactions
         .filter((t) => t.type === 'INCOME')
-        .reduce((s, t) => s + t.amount, 0)
+        .reduce((s, t) => s + Number(t.amount), 0)
       const expense = a.transactions
         .filter((t) => t.type === 'EXPENSE')
-        .reduce((s, t) => s + t.amount, 0)
-      const balance = a.initialBalance + income - expense
+        .reduce((s, t) => s + Number(t.amount), 0)
+      const balance = Number(a.initialBalance) + income - expense
       return {
         id: a.id,
         name: a.name,
         type: a.type,
         color: a.color,
-        initialBalance: a.initialBalance,
+        initialBalance: Number(a.initialBalance),
         createdAt: a.createdAt,
         updatedAt: a.updatedAt,
         _count: a._count,
@@ -46,6 +53,11 @@ export async function GET() {
 // POST /api/accounts
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { name, type, color, initialBalance } = body
 
@@ -69,6 +81,7 @@ export async function POST(req: NextRequest) {
         type,
         color: color || '#64748b',
         initialBalance: typeof initialBalance === 'number' ? initialBalance : 0,
+        userId,
       },
     })
 

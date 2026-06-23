@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // GET /api/export?month=YYYY-MM
 // Returns CSV with all transactions for the given month (or all if no month)
 export async function GET(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const month = searchParams.get('month')
 
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = { userId }
     if (month) {
       const [year, mon] = month.split('-').map(Number)
       const startDate = new Date(year, mon - 1, 1)
@@ -43,7 +49,7 @@ export async function GET(req: NextRequest) {
     const rows = transactions.map((t) => {
       const date = new Date(t.date).toLocaleDateString('es-AR')
       const type = t.type === 'INCOME' ? 'Ingreso' : 'Gasto'
-      const amount = t.amount.toFixed(2)
+      const amount = Number(t.amount).toFixed(2)
       const category = t.category?.name ?? ''
       const account = t.account?.name ?? ''
       const description = t.description ?? ''

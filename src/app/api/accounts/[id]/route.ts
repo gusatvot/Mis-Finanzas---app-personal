@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // DELETE /api/accounts/[id]
 export async function DELETE(
@@ -7,8 +8,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
-    // The FK has onDelete: SetNull, so transactions will keep their accountId = NULL
+
+    const existing = await db.account.findFirst({ where: { id, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 })
+    }
+
     await db.account.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -26,6 +37,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await req.json()
     const { name, type, color, initialBalance } = body
@@ -42,6 +58,11 @@ export async function PUT(
         { error: 'Tipo debe ser CASH, BANK o CARD' },
         { status: 400 }
       )
+    }
+
+    const existing = await db.account.findFirst({ where: { id, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Cuenta no encontrada' }, { status: 404 })
     }
 
     const account = await db.account.update({

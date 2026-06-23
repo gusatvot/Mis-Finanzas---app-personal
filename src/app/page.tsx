@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -34,9 +35,9 @@ import {
   Target,
   Repeat,
   AlertCircle,
-  Sparkles,
   Download,
   Loader2,
+  LogOut,
 } from 'lucide-react'
 
 const MONTH_OPTIONS = (() => {
@@ -53,6 +54,7 @@ const MONTH_OPTIONS = (() => {
 })()
 
 export default function Home() {
+  const { data: session, status } = useSession()
   const [selectedMonth, setSelectedMonth] = useState(monthKey())
   const [tab, setTab] = useState('dashboard')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -119,6 +121,21 @@ export default function Home() {
     }
   }
 
+  // While session is loading, show a minimal loader
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // If not authenticated, the middleware should redirect to /login
+  // but we render null as a safety net
+  if (status === 'unauthenticated' || !session) {
+    return null
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-muted/20">
       {/* Header */}
@@ -131,7 +148,7 @@ export default function Home() {
             <div className="hidden sm:block">
               <h1 className="text-base font-bold leading-tight">Mis Finanzas</h1>
               <p className="text-xs text-muted-foreground leading-tight">
-                Contabilidad personal
+                Hola, {session.user?.name || session.user?.email?.split('@')[0]}
               </p>
             </div>
           </div>
@@ -181,6 +198,15 @@ export default function Home() {
             </Button>
             <Button onClick={handleNew} size="icon" className="sm:hidden">
               <Plus className="h-4 w-4" />
+            </Button>
+
+            <Button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              size="icon"
+              variant="ghost"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
             </Button>
 
             <ThemeToggle />
@@ -323,7 +349,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t bg-background mt-auto">
         <div className="container mx-auto px-4 py-4 text-center text-xs text-muted-foreground">
-          Mis Finanzas · Hecho para llevar tu contabilidad personal · Los datos se guardan localmente
+          Mis Finanzas · Hecho para llevar tu contabilidad personal · Sesión: {session.user?.email}
         </div>
       </footer>
 

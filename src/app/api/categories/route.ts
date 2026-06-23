@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
-// GET /api/categories - list all categories
+// GET /api/categories - list categories for the current user
 export async function GET() {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const categories = await db.category.findMany({
+      where: { userId },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
       include: {
         _count: { select: { transactions: true } },
@@ -20,9 +27,14 @@ export async function GET() {
   }
 }
 
-// POST /api/categories - create a new category
+// POST /api/categories - create a new category for the current user
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { name, type, color, icon } = body
 
@@ -46,6 +58,7 @@ export async function POST(req: NextRequest) {
         type,
         color: color || '#64748b',
         icon: icon || 'Wallet',
+        userId,
       },
     })
 

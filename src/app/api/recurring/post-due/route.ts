@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // POST /api/recurring/post-due
 // Posts all due recurring transactions up to today as actual transactions.
 export async function POST() {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const now = new Date()
     const due = await db.recurringTransaction.findMany({
       where: {
+        userId,
         active: true,
         nextDue: { lte: now },
       },
@@ -30,11 +37,12 @@ export async function POST() {
       await db.transaction.create({
         data: {
           type: r.type,
-          amount: r.amount,
+          amount: Number(r.amount),
           description: r.description || r.category.name,
           date: r.nextDue,
           categoryId: r.categoryId,
           accountId: r.accountId,
+          userId,
         },
       })
 

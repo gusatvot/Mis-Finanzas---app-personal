@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // GET /api/transactions - list with optional filters
 export async function GET(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const type = searchParams.get('type') // INCOME | EXPENSE
     const categoryId = searchParams.get('categoryId')
@@ -13,7 +19,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '0')
 
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = { userId }
     if (type) where.type = type
     if (categoryId) where.categoryId = categoryId
     if (accountId) where.accountId = accountId
@@ -33,7 +39,17 @@ export async function GET(req: NextRequest) {
       ...(limit > 0 ? { take: limit } : {}),
     })
 
-    return NextResponse.json(transactions)
+    // Normalize Decimal fields for JSON serialization
+    const result = transactions.map((t) => ({
+      ...t,
+      amount: Number(t.amount),
+      category: t.category,
+      account: t.account
+        ? { ...t.account, initialBalance: Number(t.account.initialBalance) }
+        : null,
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching transactions:', error)
     return NextResponse.json(
@@ -46,6 +62,11 @@ export async function GET(req: NextRequest) {
 // POST /api/transactions
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { type, amount, description, date, categoryId, accountId } = body
 
@@ -70,12 +91,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const category = await db.category.findUnique({ where: { id: categoryId } })
+    // Make sure the category belongs to the user
+    const category = await db.category.findFirst({
+      where: { id: categoryId, userId },
+    })
     if (!category) {
       return NextResponse.json(
         { error: 'Categoría no encontrada' },
         { status: 400 }
       )
+    }
+
+    // If accountId provided, make sure it belongs to the user
+    if (accountId) {
+      const account = await db.account.findFirst({
+        where: { id: accountId, userId },
+      })
+      if (!account) {
+        return NextResponse.json(
+          { error: 'Cuenta no encontrada' },
+          { status: 400 }
+        )
+      }
     }
 
     const transaction = await db.transaction.create({
@@ -86,11 +123,20 @@ export async function POST(req: NextRequest) {
         date: new Date(date),
         categoryId,
         accountId: accountId || null,
+        userId,
       },
       include: { category: true, account: true },
     })
 
-    return NextResponse.json(transaction, { status: 201 })
+    const result = {
+      ...transaction,
+      amount: Number(transaction.amount),
+      account: transaction.account
+        ? { ...transaction.account, initialBalance: Number(transaction.account.initialBalance) }
+        : null,
+    }
+
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Error creating transaction:', error)
     return NextResponse.json(

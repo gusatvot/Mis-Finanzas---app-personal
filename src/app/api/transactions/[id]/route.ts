@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // DELETE /api/transactions/[id]
 export async function DELETE(
@@ -7,7 +8,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
+
+    const existing = await db.transaction.findFirst({ where: { id, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Transacción no encontrada' }, { status: 404 })
+    }
+
     await db.transaction.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -25,6 +37,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await req.json()
     const { type, amount, description, date, categoryId, accountId } = body
@@ -34,6 +51,11 @@ export async function PUT(
         { error: 'Faltan campos obligatorios' },
         { status: 400 }
       )
+    }
+
+    const existing = await db.transaction.findFirst({ where: { id, userId } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Transacción no encontrada' }, { status: 404 })
     }
 
     const transaction = await db.transaction.update({
@@ -49,7 +71,15 @@ export async function PUT(
       include: { category: true, account: true },
     })
 
-    return NextResponse.json(transaction)
+    const result = {
+      ...transaction,
+      amount: Number(transaction.amount),
+      account: transaction.account
+        ? { ...transaction.account, initialBalance: Number(transaction.account.initialBalance) }
+        : null,
+    }
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error updating transaction:', error)
     return NextResponse.json(

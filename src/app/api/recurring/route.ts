@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // GET /api/recurring
 export async function GET() {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const recurring = await db.recurringTransaction.findMany({
+      where: { userId },
       orderBy: [{ active: 'desc' }, { nextDue: 'asc' }],
       include: { category: true, account: true },
     })
-    return NextResponse.json(recurring)
+
+    const result = recurring.map((r) => ({
+      ...r,
+      amount: Number(r.amount),
+      account: r.account
+        ? { ...r.account, initialBalance: Number(r.account.initialBalance) }
+        : null,
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error fetching recurring transactions:', error)
     return NextResponse.json(
@@ -21,6 +37,11 @@ export async function GET() {
 // POST /api/recurring
 export async function POST(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const {
       type,
@@ -63,12 +84,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const category = await db.category.findUnique({ where: { id: categoryId } })
+    // Verify the category belongs to the user
+    const category = await db.category.findFirst({
+      where: { id: categoryId, userId },
+    })
     if (!category) {
       return NextResponse.json(
         { error: 'Categoría no encontrada' },
         { status: 400 }
       )
+    }
+
+    // Verify the account if provided
+    if (accountId) {
+      const account = await db.account.findFirst({
+        where: { id: accountId, userId },
+      })
+      if (!account) {
+        return NextResponse.json(
+          { error: 'Cuenta no encontrada' },
+          { status: 400 }
+        )
+      }
     }
 
     const start = new Date(startDate)
@@ -88,11 +125,20 @@ export async function POST(req: NextRequest) {
         endDate: endDate ? new Date(endDate) : null,
         nextDue,
         active: true,
+        userId,
       },
       include: { category: true, account: true },
     })
 
-    return NextResponse.json(recurring, { status: 201 })
+    const result = {
+      ...recurring,
+      amount: Number(recurring.amount),
+      account: recurring.account
+        ? { ...recurring.account, initialBalance: Number(recurring.account.initialBalance) }
+        : null,
+    }
+
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error('Error creating recurring transaction:', error)
     return NextResponse.json(
@@ -114,7 +160,6 @@ function computeNextDue(
   } else if (frequency === 'WEEKLY') {
     d.setDate(d.getDate() + 7)
     if (dayOfWeek != null) {
-      // Adjust to specific day of week if provided
       const cur = d.getDay()
       let diff = (dayOfWeek - cur + 7) % 7
       d.setDate(d.getDate() + diff)
@@ -122,7 +167,7 @@ function computeNextDue(
   } else if (frequency === 'MONTHLY') {
     d.setMonth(d.getMonth() + 1)
     if (dayOfMonth != null) {
-      d.setDate(Math.min(dayOfMonth, 28)) // safe day
+      d.setDate(Math.min(dayOfMonth, 28))
     }
   } else if (frequency === 'YEARLY') {
     d.setFullYear(d.getFullYear() + 1)

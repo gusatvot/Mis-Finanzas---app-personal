@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // GET /api/stats - returns dashboard statistics
 export async function GET(req: NextRequest) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const from = searchParams.get('from')
     const to = searchParams.get('to')
@@ -21,11 +27,18 @@ export async function GET(req: NextRequest) {
       if (to) endDate = new Date(to)
     }
 
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = { userId }
     if (startDate || endDate) {
       where.date = {}
       if (startDate) (where.date as Record<string, unknown>).gte = startDate
       if (endDate) (where.date as Record<string, unknown>).lte = endDate
+    }
+
+    const whereAll: Record<string, unknown> = { userId }
+    if (startDate || endDate) {
+      whereAll.date = {}
+      if (startDate) (whereAll.date as Record<string, unknown>).gte = startDate
+      if (endDate) (whereAll.date as Record<string, unknown>).lte = endDate
     }
 
     const [transactions, allTransactions, accounts] = await Promise.all([
@@ -34,8 +47,12 @@ export async function GET(req: NextRequest) {
         include: { category: true, account: true },
         orderBy: { date: 'desc' },
       }),
-      db.transaction.findMany({ select: { amount: true, type: true, date: true } }),
+      db.transaction.findMany({
+        where: whereAll,
+        select: { amount: true, type: true, date: true },
+      }),
       db.account.findMany({
+        where: { userId },
         include: {
           transactions: { select: { type: true, amount: true } },
         },
@@ -44,11 +61,11 @@ export async function GET(req: NextRequest) {
 
     const totalIncome = transactions
       .filter((t) => t.type === 'INCOME')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + Number(t.amount), 0)
 
     const totalExpense = transactions
       .filter((t) => t.type === 'EXPENSE')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + Number(t.amount), 0)
 
     const balance = totalIncome - totalExpense
 
@@ -62,7 +79,7 @@ export async function GET(req: NextRequest) {
       const key = t.categoryId
       const existing = categoryMap.get(key)
       if (existing) {
-        existing.total += t.amount
+        existing.total += Number(t.amount)
         existing.count += 1
       } else {
         categoryMap.set(key, {
@@ -70,7 +87,7 @@ export async function GET(req: NextRequest) {
           color: t.category.color,
           icon: t.category.icon,
           type: t.type,
-          total: t.amount,
+          total: Number(t.amount),
           count: 1,
         })
       }
@@ -80,7 +97,7 @@ export async function GET(req: NextRequest) {
       (a, b) => b.total - a.total
     )
 
-    // Build monthly trend for the last 6 months
+    // Build monthly trend for the last 6 months (lifetime, ignores month filter)
     const now = new Date()
     const months: { label: string; year: number; month: number; income: number; expense: number }[] = []
     for (let i = 5; i >= 0; i--) {
@@ -94,14 +111,20 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    for (const t of allTransactions) {
+    // Need lifetime transactions for the trend — query again without month filter
+    const lifetimeTx = await db.transaction.findMany({
+      where: { userId },
+      select: { amount: true, type: true, date: true },
+    })
+
+    for (const t of lifetimeTx) {
       const tDate = new Date(t.date)
       const m = months.find(
         (mo) => mo.year === tDate.getFullYear() && mo.month === tDate.getMonth()
       )
       if (m) {
-        if (t.type === 'INCOME') m.income += t.amount
-        else m.expense += t.amount
+        if (t.type === 'INCOME') m.income += Number(t.amount)
+        else m.expense += Number(t.amount)
       }
     }
 
@@ -109,17 +132,17 @@ export async function GET(req: NextRequest) {
     const byAccount = accounts.map((a) => {
       const income = a.transactions
         .filter((t) => t.type === 'INCOME')
-        .reduce((s, t) => s + t.amount, 0)
+        .reduce((s, t) => s + Number(t.amount), 0)
       const expense = a.transactions
         .filter((t) => t.type === 'EXPENSE')
-        .reduce((s, t) => s + t.amount, 0)
+        .reduce((s, t) => s + Number(t.amount), 0)
       return {
         name: a.name,
         color: a.color,
         type: a.type,
         income,
         expense,
-        balance: a.initialBalance + income - expense,
+        balance: Number(a.initialBalance) + income - expense,
       }
     })
 

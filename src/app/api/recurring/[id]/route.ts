@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentUserId } from '@/lib/auth'
 
 // PUT /api/recurring/[id] - toggle active or update
 export async function PUT(
@@ -7,9 +8,24 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await req.json()
     const { active } = body
+
+    const existing = await db.recurringTransaction.findFirst({
+      where: { id, userId },
+    })
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Recurrente no encontrada' },
+        { status: 404 }
+      )
+    }
 
     const updated = await db.recurringTransaction.update({
       where: { id },
@@ -17,7 +33,15 @@ export async function PUT(
       include: { category: true, account: true },
     })
 
-    return NextResponse.json(updated)
+    const result = {
+      ...updated,
+      amount: Number(updated.amount),
+      account: updated.account
+        ? { ...updated.account, initialBalance: Number(updated.account.initialBalance) }
+        : null,
+    }
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error updating recurring transaction:', error)
     return NextResponse.json(
@@ -33,7 +57,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { id } = await params
+
+    const existing = await db.recurringTransaction.findFirst({
+      where: { id, userId },
+    })
+    if (!existing) {
+      return NextResponse.json(
+        { error: 'Recurrente no encontrada' },
+        { status: 404 }
+      )
+    }
+
     await db.recurringTransaction.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
