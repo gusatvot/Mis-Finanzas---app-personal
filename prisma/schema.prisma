@@ -51,7 +51,7 @@ model Account {
   name           String
   type           String   // CASH | BANK | CARD
   color          String   @default("#64748b")
-  initialBalance Decimal  @default(0) @db.Decimal(12, 2)
+  initialBalance Float    @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -66,7 +66,7 @@ model Transaction {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
   type        String   // INCOME | EXPENSE
-  amount      Decimal  @db.Decimal(12, 2)
+  amount      Float
   description String
   date        DateTime
   categoryId  String   @db.ObjectId
@@ -90,7 +90,7 @@ model Budget {
   userId     String   @db.ObjectId
   categoryId String   @db.ObjectId
   month      String   // YYYY-MM
-  amount     Decimal  @db.Decimal(12, 2)
+  amount     Float
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -105,7 +105,7 @@ model RecurringTransaction {
   id           String    @id @default(auto()) @map("_id") @db.ObjectId
   userId       String    @db.ObjectId
   type         String    // INCOME | EXPENSE
-  amount       Decimal   @db.Decimal(12, 2)
+  amount       Float
   description  String
   categoryId   String    @db.ObjectId
   accountId    String?   @db.ObjectId
