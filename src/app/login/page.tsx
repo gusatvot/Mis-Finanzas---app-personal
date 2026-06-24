@@ -21,8 +21,17 @@ import {
   EyeOff,
 } from 'lucide-react'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
