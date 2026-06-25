@@ -11,6 +11,36 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
+  // Necesario para Vercel: confía en el header Host para determinar la URL
+  trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: 'next-auth.callback-url',
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+      },
+    },
+    csrfToken: {
+      name: 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'credentials',
