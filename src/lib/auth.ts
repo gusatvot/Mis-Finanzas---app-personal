@@ -11,7 +11,6 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
-  // Necesario para Vercel: confía en el header Host para determinar la URL
   trustHost: true,
   cookies: {
     sessionToken: {
